@@ -63,7 +63,7 @@ def drawFloorCrop(event,x,y,flags,params):
     if event == cv2.EVENT_MOUSEMOVE and not (len(params['croppingPolygons'][name]) == 4 and RENEW_TETRAGON):
         params['croppingPolygons'][name][-1] = [x, y]
         if len(params['croppingPolygons'][name]) > 1:
-            cv2.fillPoly(imgCroppingPolygon, [np.reshape(params['croppingPolygons'][name], (len(params['croppingPolygons'][name]),2))], BGR_COLOR['green'], cv2.LINE_AA)
+            cv2.fillPoly(imgCroppingPolygon, [np.reshape(params['croppingPolygons'][name], (len(params['croppingPolygons'][name]),2))], BGR_COLOR['green'])
             imgCroppingPolygon = cv2.addWeighted(params['imgFloorCorners'], 1.0, imgCroppingPolygon, 0.5, 0.)
             cv2.imshow('Floor Corners for ' + name, imgCroppingPolygon)
 
@@ -75,7 +75,7 @@ def floorCrop(filename):
     global perspectiveMatrix,tetragons,name,croppingPolygons
     name = os.path.splitext(filename)[0]
     cap = cv2.VideoCapture(filename)
-    h, w = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT)), int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+    h, w = int(cap.get(cv2.cv.CV_CAP_PROP_FRAME_HEIGHT)), int(cap.get(cv2.cv.CV_CAP_PROP_FRAME_WIDTH))
 
     # Take first non-null frame and find corners within it
     ret, frame = cap.read()
@@ -88,7 +88,7 @@ def floorCrop(filename):
     kernelSize = (5, 5)
     frameBlur = cv2.GaussianBlur(frameGray, kernelSize, 0)
     retval, mask = cv2.threshold(frameBlur, THRESHOLD_WALL_VS_FLOOR, 255, cv2.THRESH_BINARY_INV)
-    _, contours, hierarchy = cv2.findContours(mask, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
+    contours, hierarchy = cv2.findContours(mask, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
 
     tetragons = []
     HALF_AREA = 0.5*h*h
@@ -107,9 +107,9 @@ def floorCrop(filename):
                 tetragons.append(contour)
     frameGray = cv2.cvtColor(frameGray, cv2.COLOR_GRAY2BGR)
     imgSquare = np.zeros_like(frameGray)
-    cv2.fillPoly(imgSquare, tetragons, BGR_COLOR['red'], cv2.LINE_AA)
+    cv2.fillPoly(imgSquare, tetragons, BGR_COLOR['red'])
     # cv2.add(frameGray, imgSquare/2, frameGray)
-    cv2.drawContours( frameGray, tetragons, -1, BGR_COLOR['red'], 2, cv2.LINE_AA )
+    cv2.drawContours( frameGray, tetragons, -1, BGR_COLOR['red'], 2 )
 
     tetragonVertices = tetragons[0]
     # Sort the cropping tetragon vertices according to the following order:
@@ -135,7 +135,7 @@ def trace(filename):
     # croppingPolygons[name] = np.array([[0,0]])
     name = os.path.splitext(filename)[0]
     cap = cv2.VideoCapture(filename)
-    h, w = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT)), int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+    h, w = int(cap.get(cv2.cv.CV_CAP_PROP_FRAME_HEIGHT)), int(cap.get(cv2.cv.CV_CAP_PROP_FRAME_WIDTH))
 
     # Take first non-null frame and find corners within it
     ret, frame = cap.read()
@@ -146,7 +146,13 @@ def trace(filename):
     
     # floorCrop(filename)
 
-    video = cv2.VideoWriter(RELATIVE_DESTINATION_PATH + 'timing/' + name + "_trace.avi", cv2.VideoWriter_fourcc(*'X264'), FPS, HD, cv2.INTER_LINEAR)
+    video = cv2.VideoWriter(
+            RELATIVE_DESTINATION_PATH + 'timing/' + name + "_trace.avi"
+            , cv2.cv.CV_FOURCC('X','2', '6', '4')
+            , FPS
+            , HD
+            , cv2.INTER_LINEAR
+            )
     imgTrack = np.zeros_like(frame)
 
     start = time.time()
@@ -156,13 +162,13 @@ def trace(filename):
         
         if frame is None:   # not logical
             break
-        t = cap.get(cv2.CAP_PROP_POS_MSEC) / 1000.
+        t = cap.get(cv2.cv.CV_CAP_PROP_POS_MSEC) / 1000.
         frame = frame[:, w-h:w]
         frameColor = frame.copy()
         if len(croppingPolygons[name]) == 4:
-            cv2.drawContours(frameColor, [np.reshape(croppingPolygons[name], (4,2))], -1, BGR_COLOR['red'], 2, cv2.LINE_AA)
+            cv2.drawContours(frameColor, [np.reshape(croppingPolygons[name], (4,2))], -1, BGR_COLOR['red'], 2 )
         else:
-            cv2.drawContours(frameColor, tetragons, -1, BGR_COLOR['red'], 2, cv2.LINE_AA)
+            cv2.drawContours(frameColor, tetragons, -1, BGR_COLOR['red'], 2 )
 
         frame = cv2.warpPerspective(frame, perspectiveMatrix[name], (h,h))
 
@@ -170,7 +176,7 @@ def trace(filename):
         kernelSize = (25, 25)
         frameBlur = cv2.GaussianBlur(frameGray, kernelSize, 0)
         _, thresh = cv2.threshold(frameBlur, THRESHOLD_ANIMAL_VS_FLOOR, 255, cv2.THRESH_BINARY)
-        _, contours, hierarchy = cv2.findContours(thresh.copy(),cv2.RETR_TREE, cv2.CHAIN_APPROX_NONE)
+        contours, hierarchy = cv2.findContours(thresh.copy(),cv2.RETR_TREE, cv2.CHAIN_APPROX_NONE)
         if len(contours) < 1:   # TODO more pythonic way of the check
             continue
 
@@ -190,17 +196,16 @@ def trace(filename):
             imgPoints = np.zeros(frame.shape,np.uint8)
             for i in range(2, len(hull)-2):
                 if np.dot(hull[i][0]- hull[i-2][0], hull[i][0]- hull[i+2][0]) > 0:
-                    imgPoints = cv2.circle(imgPoints, (hull[i][0][0],hull[i][0][1]), 5, BGR_COLOR['yellow'], -1, cv2.LINE_AA)
+                    imgPoints = cv2.circle(imgPoints, (hull[i][0][0],hull[i][0][1]), 5, BGR_COLOR['yellow'], -1 )
 
             # Draw a contour and a centroid of the animal
-            cv2.drawContours(imgPoints, [contour], 0, BGR_COLOR['green'], 2, cv2.LINE_AA)
+            cv2.drawContours(imgPoints, [contour], -1, 0 )
             imgPoints = cv2.circle(imgPoints, (x,y), 5, BGR_COLOR['black'], -1)
             
             # Draw a track of the animal
             # imgTrack = cv2.add(np.zeros_like(imgTrack), cv2.line(imgTrack, (x,y), (_x,_y),
-                # (255, 127, int(cap.get(cv2.CAP_PROP_POS_AVI_RATIO)*255)), 1, cv2.LINE_AA))
             imgTrack = cv2.addWeighted(np.zeros_like(imgTrack), 0.85, cv2.line(imgTrack, (x,y), (_x,_y),
-                (255, 127, int(cap.get(cv2.CAP_PROP_POS_AVI_RATIO)*255)), 1, cv2.LINE_AA), 0.98, 0.)
+                (255, 127, int(cap.get(cv2.CAP_PROP_POS_AVI_RATIO)*255)), 1, cv2), 0.98, 0.)
             imgContour = cv2.add(imgPoints, imgTrack)
 
             frame = cv2.bitwise_and(frame, frame, mask = thresh)
@@ -210,7 +215,7 @@ def trace(filename):
                 (190,420), cv2.FONT_HERSHEY_DUPLEX, 1, BGR_COLOR['white'])
             cv2.putText(frame, "Time " + str('%.0f sec' % (cap.get(cv2.CAP_PROP_POS_MSEC)/1000.)),
                 (200,450), cv2.FONT_HERSHEY_DUPLEX, 1, BGR_COLOR['white'])
-            cv2.circle(frame, (x,y), 5, BGR_COLOR['black'], -1, cv2.LINE_AA)
+            cv2.circle(frame, (x,y), 5, BGR_COLOR['black'], -1 )
             layout = np.hstack((frame, frameColor))
 
             cv2.imshow('Open Field Trace of ' + name, layout)
@@ -238,8 +243,6 @@ def trace(filename):
     file.write(name + ",%.2f" % distance + ",%.1f\n" % t)
     file.close()
 
-if len(sys.argv)>1 and '--online' in sys.argv:
-    ONLINE = True
 if not os.path.exists(RELATIVE_DESTINATION_PATH + 'traces'):
     os.makedirs(RELATIVE_DESTINATION_PATH + 'traces')
 if not os.path.exists(RELATIVE_DESTINATION_PATH + 'timing'):
