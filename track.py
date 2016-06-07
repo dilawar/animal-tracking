@@ -248,8 +248,13 @@ file = open(RELATIVE_DESTINATION_PATH + "distances.csv", 'w')
 file.write("animal,distance [unit of the box side],run time [seconds]\n")
 file.close()
 
-for filename in glob.glob("*.avi"):
+
+def main( ):
+    filename = sys.argv[1]
+    print( 'Processing file %s' % filename )
     floorCrop(filename)
-for filename in glob.glob("*.avi"):
     file = open(RELATIVE_DESTINATION_PATH + "distances.csv", 'a')
     trace(filename)
+
+if __name__ == '__main__':
+    main()
