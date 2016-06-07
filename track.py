@@ -20,7 +20,7 @@ WAIT_DELAY = 1
 
 perspectiveMatrix = dict()
 croppingPolygon = np.array([[0,0]])
-croppingPolygons = dict()
+croppingPolygons = { 'name' : [] }
 tetragons = []
 name = ""
 
@@ -111,6 +111,8 @@ def floorCrop(filename):
     # cv2.add(frameGray, imgSquare/2, frameGray)
     cv2.drawContours( frameGray, tetragons, -1, BGR_COLOR['red'], 2 )
 
+    if not tetragons:
+        return [], None
     tetragonVertices = tetragons[0]
     # Sort the cropping tetragon vertices according to the following order:
     # [left, top], [left, bottom], [right, bottom], [right, top]
@@ -148,7 +150,7 @@ def trace(filename):
 
     video = cv2.VideoWriter(
             RELATIVE_DESTINATION_PATH + 'timing/' + name + "_trace.avi"
-            , cv2.cv.CV_FOURCC('X','2', '6', '4')
+            , cv2.cv.CV_FOURCC( *'XVID' )
             , FPS
             , HD
             , cv2.INTER_LINEAR
@@ -159,18 +161,17 @@ def trace(filename):
     distance = _x = _y = 0
     while frame is not None:
         ret, frame = cap.read()
-        
         if frame is None:   # not logical
             break
         t = cap.get(cv2.cv.CV_CAP_PROP_POS_MSEC) / 1000.
         frame = frame[:, w-h:w]
         frameColor = frame.copy()
-        if len(croppingPolygons[name]) == 4:
+        if len(croppingPolygons.get(name, [])) == 4:
             cv2.drawContours(frameColor, [np.reshape(croppingPolygons[name], (4,2))], -1, BGR_COLOR['red'], 2 )
         else:
             cv2.drawContours(frameColor, tetragons, -1, BGR_COLOR['red'], 2 )
 
-        frame = cv2.warpPerspective(frame, perspectiveMatrix[name], (h,h))
+        frame = cv2.warpPerspective(frame, perspectiveMatrix.get(name), (h,h))
 
         frameGray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
         kernelSize = (25, 25)
@@ -193,27 +194,28 @@ def trace(filename):
         if ONLINE:
             # Draw the most acute angles of the contour (tail/muzzle/paws of the animal)
             hull = cv2.convexHull(contour)
-            imgPoints = np.zeros(frame.shape,np.uint8)
+            imgPoints = np.zeros(frame.shape, np.uint8)
             for i in range(2, len(hull)-2):
                 if np.dot(hull[i][0]- hull[i-2][0], hull[i][0]- hull[i+2][0]) > 0:
-                    imgPoints = cv2.circle(imgPoints, (hull[i][0][0],hull[i][0][1]), 5, BGR_COLOR['yellow'], -1 )
+                    cv2.circle(imgPoints, (hull[i][0][0],hull[i][0][1]), 5, BGR_COLOR['yellow'], -1 )
 
             # Draw a contour and a centroid of the animal
-            cv2.drawContours(imgPoints, [contour], -1, 0 )
-            imgPoints = cv2.circle(imgPoints, (x,y), 5, BGR_COLOR['black'], -1)
+            cv2.drawContours(imgPoints, contour, -1, 1 )
+            cv2.circle(imgPoints, (x,y), 5, BGR_COLOR['black'], -1)
             
             # Draw a track of the animal
-            # imgTrack = cv2.add(np.zeros_like(imgTrack), cv2.line(imgTrack, (x,y), (_x,_y),
-            imgTrack = cv2.addWeighted(np.zeros_like(imgTrack), 0.85, cv2.line(imgTrack, (x,y), (_x,_y),
-                (255, 127, int(cap.get(cv2.CAP_PROP_POS_AVI_RATIO)*255)), 1, cv2), 0.98, 0.)
-            imgContour = cv2.add(imgPoints, imgTrack)
+            #imgTrack = cv2.add(np.zeros_like(imgTrack), cv2.line(imgTrack, (x,y), (_x,_y),
+            #imgTrack = cv2.addWeighted(np.zeros_like(imgTrack), 0.85, cv2.line(imgTrack, (x,y), (_x,_y),
+            #    (255, 127, int(cap.get(cv2.cv.CV_CAP_PROP_POS_AVI_RATIO)*255)), 1), 0.98, 0.)
+            #imgContour = cv2.add(imgPoints, imgTrack)
+            imgContour = imgPoints
 
             frame = cv2.bitwise_and(frame, frame, mask = thresh)
             frame = cv2.addWeighted(frame, 0.4, imgContour, 1.0, 0.)
 
             cv2.putText(frame, "Distance " + str('%.2f' % distance),
                 (190,420), cv2.FONT_HERSHEY_DUPLEX, 1, BGR_COLOR['white'])
-            cv2.putText(frame, "Time " + str('%.0f sec' % (cap.get(cv2.CAP_PROP_POS_MSEC)/1000.)),
+            cv2.putText(frame, "Time " + str('%.0f sec' % (cap.get(cv2.cv.CV_CAP_PROP_POS_MSEC)/1000.)),
                 (200,450), cv2.FONT_HERSHEY_DUPLEX, 1, BGR_COLOR['white'])
             cv2.circle(frame, (x,y), 5, BGR_COLOR['black'], -1 )
             layout = np.hstack((frame, frameColor))
